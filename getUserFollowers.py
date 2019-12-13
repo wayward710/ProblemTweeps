@@ -33,8 +33,26 @@ def get_followers(users):
                 time.sleep(60)
     return followers
 
+
 # save the list of followers to tab-delimited text file
-def save_followers_to_csv(outfile, data):
+# outfile -- name/location of file to save to
+# data -- list of user objects
+# -blocklist='blocktogetherfile' file containing blocklist ids
+# -skip_blocklist=True/False (whether to include users on blocklist in output)
+
+def save_followers_to_csv(outfile, data, **kwargs):
+
+    blocklistids = []
+    skip_blocklist = False
+
+    if "blocklist" in kwargs.keys():
+        with open(kwargs["blocklist"]) as blockfile:
+            blocklines = blockfile.readlines();
+            for bline in blocklines:
+                blocklistids.append(int(bline.strip()))
+
+    if "skipblocked" in kwargs.keys():
+        skip_blocklist = kwargs["skipblocked"]
 
     # Stuff that frequently shows up in TERF profiles but not elsewhere
     terf_words = ['deboosted', 'gender critical', 'gendercritical',
@@ -47,15 +65,17 @@ def save_followers_to_csv(outfile, data):
                   'shadowbanned', 'shadow-banned',
                   'shadow banned', 'lgballiance',
                   'terf ', ' terf', ',terf', 'terf,', 'lgb ',
-                  '\\ud83d\\udd78', '\\ud83d\\udd77'
-                                    'not the fun kind', 'gender abolitionist', 'the xx kind']
+                  '\\ud83d\\udd78', '\\ud83d\\udd77',
+                  'not the fun kind', 'gender abolitionist', 'the xx kind']
 
     # Twitter fields
     HEADERS = ["screen_name", "name", "description", "url", "followers_count",
                "friends_count", "location", "verified", "created_at"]
     # Add header item for TERF predictor
     HEADERS2 = ["screen_name", "name", "description", "url", "followers_count",
-               "friends_count", "location", "verified", "created_at", "likely_terf"]
+                "friends_count", "location", "verified", "created_at",
+                "likely_terf", "onblocklist"]
+
     with open(outfile, 'w', encoding="utf-8", newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter='\t')
         csv_writer.writerow(HEADERS2)
@@ -67,15 +87,25 @@ def save_followers_to_csv(outfile, data):
             for term in terf_words:
                 if term in string_to_compare:
                     found_TERF = True
+
             for header in HEADERS:
                 profile.append(profile_data._json[header])
             profile.append(found_TERF)
+
+            # Check to see if profile is in blocklist
+            in_blocklist = False
+            if profile_data.id in blocklistids:
+                in_blocklist = True
+            profile.append(in_blocklist)
+
             # Clean the newlines out of the description
             profile[2] = re.sub('\r?\n', ' ', profile[2])
-            csv_writer.writerow(profile)
+            if not (in_blocklist and skip_blocklist):
+                csv_writer.writerow(profile)
 
 
 if __name__ == '__main__':
     problem_children = ["problemchild1", "problemchild2"]
     followers = get_followers(problem_children)
-    save_followers_to_csv("/junk/followers.txt", followers)
+    save_followers_to_csv("junk/garbage.txt", followers,
+                          blocklist="junk/TTurfer-blocklist2.csv", skipblocked=True)
